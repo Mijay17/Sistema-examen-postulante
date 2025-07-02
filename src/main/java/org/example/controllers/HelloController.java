@@ -104,6 +104,7 @@ public class HelloController implements Initializable {
         configurarChart();
         configurarComboBoxes();
         configurarEventHandlers();
+        inicializarEstado();
 
         // Generar gabarito aleatorio
         gabaritoRespuestas = generarGabaritoAleatorio();
@@ -176,7 +177,28 @@ public class HelloController implements Initializable {
     }
 
     private void configurarSpinner() {
-        spinnerCantidad.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, 1000, 50));
+        // Configurar spinner con valores más amplios y editable
+        SpinnerValueFactory.IntegerSpinnerValueFactory valueFactory =
+                new SpinnerValueFactory.IntegerSpinnerValueFactory(1, 10000, 50);
+        valueFactory.setWrapAround(false);
+        spinnerCantidad.setValueFactory(valueFactory);
+
+        // Hacer el spinner editable
+        spinnerCantidad.setEditable(true);
+
+        // Agregar listener para validar entrada manual
+        spinnerCantidad.getEditor().textProperty().addListener((observable, oldValue, newValue) -> {
+            if (!newValue.matches("\\d*")) {
+                spinnerCantidad.getEditor().setText(newValue.replaceAll("[^\\d]", ""));
+            }
+        });
+
+        // Commit del valor cuando se pierde el foco
+        spinnerCantidad.focusedProperty().addListener((observable, oldValue, newValue) -> {
+            if (!newValue) {
+                spinnerCantidad.increment(0); // Esto fuerza el commit del valor
+            }
+        });
     }
 
     private void configurarChart() {
@@ -184,6 +206,7 @@ public class HelloController implements Initializable {
         xAxis.setLabel("Estado de Postulantes");
         yAxis.setLabel("Cantidad");
         chartResultados.setLegendVisible(false);
+        chartResultados.setAnimated(false); // Desactivar animaciones para mejor rendimiento
     }
 
     private void configurarComboBoxes() {
@@ -224,27 +247,66 @@ public class HelloController implements Initializable {
         btnLimpiar.setOnAction(e -> limpiarDatos());
     }
 
+    private void inicializarEstado() {
+        // Deshabilitar botones de evaluación al inicio
+        btnEvaluarSecuencial.setDisable(true);
+        btnEvaluarParalelo.setDisable(true);
+
+        // Limpiar estadísticas detalladas
+        lblPromedioGeneral.setText("--");
+        lblMejorPuntaje.setText("--");
+        lblTiempoPromedio.setText("--");
+        lblTasaAprobacion.setText("--");
+
+        // Limpiar estadísticas generales
+        lblEstadisticas.setText("");
+
+        // Reiniciar progress bar
+        progressBar.setProgress(0);
+    }
+
     @FXML
     private void generarPostulantes() {
-        int cantidad = spinnerCantidad.getValue();
-        List<Postulante> nuevosPostulantes = generarPostulantesPrueba(cantidad);
+        try {
+            // Obtener cantidad del spinner con validación
+            Integer cantidad = spinnerCantidad.getValue();
+            if (cantidad == null || cantidad <= 0) {
+                mostrarAlerta("Error", "Por favor ingrese una cantidad válida de postulantes (mayor a 0)");
+                return;
+            }
 
-        listaPostulantes.clear();
-        for (Postulante postulante : nuevosPostulantes) {
-            PostulanteEvaluacion pe = new PostulanteEvaluacion(postulante);
-            // Usar tu GeneratorService para generar respuestas aleatorias
-            String respuestasAleatorias = GeneratorService.generarRespuestasAleatorias();
-            pe.getRespuestas().setRespuesta(respuestasAleatorias);
-            listaPostulantes.add(pe);
+            if (cantidad > 10000) {
+                mostrarAlerta("Advertencia", "Se recomienda no generar más de 10,000 postulantes para mejor rendimiento");
+            }
+
+            // Cancelar tarea anterior si existe
+            if (tareaActual != null && tareaActual.isRunning()) {
+                tareaActual.cancel();
+            }
+
+            List<Postulante> nuevosPostulantes = generarPostulantesPrueba(cantidad);
+
+            listaPostulantes.clear();
+            for (Postulante postulante : nuevosPostulantes) {
+                PostulanteEvaluacion pe = new PostulanteEvaluacion(postulante);
+                // Usar tu GeneratorService para generar respuestas aleatorias
+                String respuestasAleatorias = GeneratorService.generarRespuestasAleatorias();
+                pe.getRespuestas().setRespuesta(respuestasAleatorias);
+                listaPostulantes.add(pe);
+            }
+
+            actualizarChart();
+            lblProgreso.setText("Generados " + cantidad + " postulantes con respuestas aleatorias");
+            lblEstadisticas.setText("Total: " + cantidad + " | Pendientes: " + cantidad);
+
+            // Habilitar botones de evaluación
+            btnEvaluarSecuencial.setDisable(false);
+            btnEvaluarParalelo.setDisable(false);
+
+        } catch (Exception ex) {
+            mostrarAlerta("Error", "Error al generar postulantes: " + ex.getMessage());
+            ex.printStackTrace();
         }
-
-        actualizarChart();
-        lblProgreso.setText("Generados " + cantidad + " postulantes con respuestas aleatorias");
-        lblEstadisticas.setText("Total: " + cantidad + " | Pendientes: " + cantidad);
-
-        // Habilitar botones de evaluación
-        btnEvaluarSecuencial.setDisable(false);
-        btnEvaluarParalelo.setDisable(false);
     }
 
     @FXML
@@ -409,118 +471,150 @@ public class HelloController implements Initializable {
     }
 
     private void prepararEvaluacion() {
-        // Resetear estados
-        listaPostulantes.forEach(pe -> {
-            pe.setEstado("Evaluando");
-            pe.getResultado().setPuntaje(0.0);
-            pe.setTiempoEvaluacion(0);
-        });
+        try {
+            // Resetear estados
+            listaPostulantes.forEach(pe -> {
+                pe.setEstado("Evaluando");
+                pe.getResultado().setPuntaje(0.0);
+                pe.setTiempoEvaluacion(0);
+            });
 
-        progressBar.setProgress(0);
-        btnEvaluarSecuencial.setDisable(true);
-        btnEvaluarParalelo.setDisable(true);
-        btnGenerar.setDisable(true);
+            progressBar.setProgress(0);
+            btnEvaluarSecuencial.setDisable(true);
+            btnEvaluarParalelo.setDisable(true);
+            btnGenerar.setDisable(true);
 
-        tablePostulantes.refresh();
+            tablePostulantes.refresh();
+        } catch (Exception ex) {
+            mostrarAlerta("Error", "Error al preparar evaluación: " + ex.getMessage());
+        }
     }
 
     private void configurarTarea(Task<?> tarea) {
-        progressBar.progressProperty().bind(tarea.progressProperty());
+        try {
+            progressBar.progressProperty().bind(tarea.progressProperty());
 
-        tarea.setOnSucceeded(e -> finalizarEvaluacion());
-        tarea.setOnFailed(e -> {
-            finalizarEvaluacion();
-            mostrarAlerta("Error", "Error durante la evaluación: " + tarea.getException().getMessage());
-        });
-        tarea.setOnCancelled(e -> finalizarEvaluacion());
+            tarea.setOnSucceeded(e -> finalizarEvaluacion());
+            tarea.setOnFailed(e -> {
+                finalizarEvaluacion();
+                mostrarAlerta("Error", "Error durante la evaluación: " +
+                        (tarea.getException() != null ? tarea.getException().getMessage() : "Error desconocido"));
+            });
+            tarea.setOnCancelled(e -> finalizarEvaluacion());
+        } catch (Exception ex) {
+            mostrarAlerta("Error", "Error al configurar tarea: " + ex.getMessage());
+        }
     }
 
     private void finalizarEvaluacion() {
         Platform.runLater(() -> {
-            btnEvaluarSecuencial.setDisable(false);
-            btnEvaluarParalelo.setDisable(false);
-            btnGenerar.setDisable(false);
-            actualizarChart();
-            actualizarEstadisticas();
-            tablePostulantes.refresh();
+            try {
+                // Desvincular progress bar de la tarea
+                progressBar.progressProperty().unbind();
+
+                btnEvaluarSecuencial.setDisable(false);
+                btnEvaluarParalelo.setDisable(false);
+                btnGenerar.setDisable(false);
+                actualizarChart();
+                actualizarEstadisticas();
+                tablePostulantes.refresh();
+            } catch (Exception ex) {
+                mostrarAlerta("Error", "Error al finalizar evaluación: " + ex.getMessage());
+            }
         });
     }
 
     private void actualizarEstadisticas() {
-        long total = listaPostulantes.size();
-        long aprobados = listaPostulantes.stream()
-                .mapToLong(pe -> "Aprobado".equals(pe.getEstado()) ? 1 : 0).sum();
-        long desaprobados = listaPostulantes.stream()
-                .mapToLong(pe -> "Desaprobado".equals(pe.getEstado()) ? 1 : 0).sum();
-        long noSePresentaron = listaPostulantes.stream()
-                .mapToLong(pe -> "No se presentó".equals(pe.getEstado()) ? 1 : 0).sum();
-        long pendientes = total - aprobados - desaprobados - noSePresentaron;
+        try {
+            long total = listaPostulantes.size();
+            long aprobados = listaPostulantes.stream()
+                    .mapToLong(pe -> "Aprobado".equals(pe.getEstado()) ? 1 : 0).sum();
+            long desaprobados = listaPostulantes.stream()
+                    .mapToLong(pe -> "Desaprobado".equals(pe.getEstado()) ? 1 : 0).sum();
+            long noSePresentaron = listaPostulantes.stream()
+                    .mapToLong(pe -> "No se presentó".equals(pe.getEstado()) ? 1 : 0).sum();
+            long pendientes = total - aprobados - desaprobados - noSePresentaron;
 
-        lblEstadisticas.setText(String.format(
-                "Total: %d | Aprobados: %d (%.1f%%) | Desaprobados: %d (%.1f%%) | No se presentaron: %d | Pendientes: %d",
-                total, aprobados, (total > 0 ? aprobados * 100.0 / total : 0),
-                desaprobados, (total > 0 ? desaprobados * 100.0 / total : 0), noSePresentaron, pendientes));
+            lblEstadisticas.setText(String.format(
+                    "Total: %d | Aprobados: %d (%.1f%%) | Desaprobados: %d (%.1f%%) | No se presentaron: %d | Pendientes: %d",
+                    total, aprobados, (total > 0 ? aprobados * 100.0 / total : 0),
+                    desaprobados, (total > 0 ? desaprobados * 100.0 / total : 0), noSePresentaron, pendientes));
 
-        actualizarEstadisticasDetalladas();
+            actualizarEstadisticasDetalladas();
+        } catch (Exception ex) {
+            System.err.println("Error actualizando estadísticas: " + ex.getMessage());
+        }
     }
 
     private void actualizarEstadisticasDetalladas() {
-        // Calcular promedio general solo de evaluados
-        double promedioGeneral = listaPostulantes.stream()
-                .filter(pe -> pe.getPuntaje() != null && pe.getPuntaje() > 0)
-                .mapToDouble(PostulanteEvaluacion::getPuntaje)
-                .average()
-                .orElse(0.0);
+        try {
+            // Calcular promedio general solo de evaluados
+            double promedioGeneral = listaPostulantes.stream()
+                    .filter(pe -> pe.getPuntaje() != null && pe.getPuntaje() > 0)
+                    .mapToDouble(PostulanteEvaluacion::getPuntaje)
+                    .average()
+                    .orElse(0.0);
 
-        // Encontrar mejor puntaje
-        double mejorPuntaje = listaPostulantes.stream()
-                .filter(pe -> pe.getPuntaje() != null)
-                .mapToDouble(PostulanteEvaluacion::getPuntaje)
-                .max()
-                .orElse(0.0);
+            // Encontrar mejor puntaje
+            double mejorPuntaje = listaPostulantes.stream()
+                    .filter(pe -> pe.getPuntaje() != null)
+                    .mapToDouble(PostulanteEvaluacion::getPuntaje)
+                    .max()
+                    .orElse(0.0);
 
-        // Calcular tiempo promedio
-        double tiempoPromedio = listaPostulantes.stream()
-                .filter(pe -> pe.getTiempo() != null && pe.getTiempo() > 0)
-                .mapToLong(PostulanteEvaluacion::getTiempo)
-                .average()
-                .orElse(0.0);
+            // Calcular tiempo promedio
+            double tiempoPromedio = listaPostulantes.stream()
+                    .filter(pe -> pe.getTiempo() != null && pe.getTiempo() > 0)
+                    .mapToLong(PostulanteEvaluacion::getTiempo)
+                    .average()
+                    .orElse(0.0);
 
-        // Calcular tasa de aprobación
-        long totalEvaluados = listaPostulantes.stream()
-                .mapToLong(pe -> pe.getPuntaje() != null && pe.getPuntaje() > 0 ? 1 : 0).sum();
+            // Calcular tasa de aprobación
+            long totalEvaluados = listaPostulantes.stream()
+                    .mapToLong(pe -> pe.getPuntaje() != null && pe.getPuntaje() > 0 ? 1 : 0).sum();
 
-        long aprobados = listaPostulantes.stream()
-                .mapToLong(pe -> "Aprobado".equals(pe.getEstado()) ? 1 : 0).sum();
+            long aprobados = listaPostulantes.stream()
+                    .mapToLong(pe -> "Aprobado".equals(pe.getEstado()) ? 1 : 0).sum();
 
-        double tasaAprobacion = totalEvaluados > 0 ? (aprobados * 100.0 / totalEvaluados) : 0.0;
+            double tasaAprobacion = totalEvaluados > 0 ? (aprobados * 100.0 / totalEvaluados) : 0.0;
 
-        // Actualizar labels
-        lblPromedioGeneral.setText(String.format("%.2f", promedioGeneral));
-        lblMejorPuntaje.setText(String.format("%.2f", mejorPuntaje));
-        lblTiempoPromedio.setText(String.format("%.0f ms", tiempoPromedio));
-        lblTasaAprobacion.setText(String.format("%.1f%%", tasaAprobacion));
+            // Actualizar labels de forma segura
+            Platform.runLater(() -> {
+                lblPromedioGeneral.setText(String.format("%.2f", promedioGeneral));
+                lblMejorPuntaje.setText(String.format("%.2f", mejorPuntaje));
+                lblTiempoPromedio.setText(String.format("%.0f ms", tiempoPromedio));
+                lblTasaAprobacion.setText(String.format("%.1f%%", tasaAprobacion));
+            });
+        } catch (Exception ex) {
+            System.err.println("Error actualizando estadísticas detalladas: " + ex.getMessage());
+        }
     }
 
     private void actualizarChart() {
-        long aprobados = listaPostulantes.stream()
-                .mapToLong(pe -> "Aprobado".equals(pe.getEstado()) ? 1 : 0).sum();
-        long desaprobados = listaPostulantes.stream()
-                .mapToLong(pe -> "Desaprobado".equals(pe.getEstado()) ? 1 : 0).sum();
-        long noSePresentaron = listaPostulantes.stream()
-                .mapToLong(pe -> "No se presentó".equals(pe.getEstado()) ? 1 : 0).sum();
-        long pendientes = listaPostulantes.stream()
-                .mapToLong(pe -> "Pendiente".equals(pe.getEstado()) ||
-                        "Evaluando".equals(pe.getEstado()) ? 1 : 0).sum();
+        try {
+            Platform.runLater(() -> {
+                long aprobados = listaPostulantes.stream()
+                        .mapToLong(pe -> "Aprobado".equals(pe.getEstado()) ? 1 : 0).sum();
+                long desaprobados = listaPostulantes.stream()
+                        .mapToLong(pe -> "Desaprobado".equals(pe.getEstado()) ? 1 : 0).sum();
+                long noSePresentaron = listaPostulantes.stream()
+                        .mapToLong(pe -> "No se presentó".equals(pe.getEstado()) ? 1 : 0).sum();
+                long pendientes = listaPostulantes.stream()
+                        .mapToLong(pe -> "Pendiente".equals(pe.getEstado()) ||
+                                "Evaluando".equals(pe.getEstado()) ? 1 : 0).sum();
 
-        XYChart.Series<String, Number> series = new XYChart.Series<>();
-        series.getData().add(new XYChart.Data<>("Aprobados", aprobados));
-        series.getData().add(new XYChart.Data<>("Desaprobados", desaprobados));
-        series.getData().add(new XYChart.Data<>("No se presentaron", noSePresentaron));
-        series.getData().add(new XYChart.Data<>("Pendientes", pendientes));
+                XYChart.Series<String, Number> series = new XYChart.Series<>();
+                series.getData().add(new XYChart.Data<>("Aprobados", aprobados));
+                series.getData().add(new XYChart.Data<>("Desaprobados", desaprobados));
+                series.getData().add(new XYChart.Data<>("No se presentaron", noSePresentaron));
+                series.getData().add(new XYChart.Data<>("Pendientes", pendientes));
 
-        chartResultados.getData().clear();
-        chartResultados.getData().add(series);
+                chartResultados.getData().clear();
+                chartResultados.getData().add(series);
+            });
+        } catch (Exception ex) {
+            System.err.println("Error actualizando chart: " + ex.getMessage());
+        }
     }
 
     private void filtrarPostulantes() {
@@ -535,31 +629,80 @@ public class HelloController implements Initializable {
 
     @FXML
     private void limpiarDatos() {
-        if (tareaActual != null && tareaActual.isRunning()) {
-            tareaActual.cancel();
+        try {
+            // Cancelar cualquier tarea en ejecución de forma segura
+            if (tareaActual != null && tareaActual.isRunning()) {
+                tareaActual.cancel(true);
+
+                // Esperar un momento para que la tarea se cancele
+                Platform.runLater(() -> {
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    ejecutarLimpieza();
+                });
+            } else {
+                ejecutarLimpieza();
+            }
+        } catch (Exception ex) {
+            mostrarAlerta("Error", "Error al limpiar datos: " + ex.getMessage());
+            // Intentar limpiar de todos modos
+            ejecutarLimpieza();
         }
+    }
 
-        listaPostulantes.clear();
-        progressBar.setProgress(0);
-        lblProgreso.setText("Sistema listo - Gabarito generado");
-        lblEstadisticas.setText("");
-        chartResultados.getData().clear();
+    private void ejecutarLimpieza() {
+        Platform.runLater(() -> {
+            try {
+                // Desvincular el progress bar de cualquier tarea
+                progressBar.progressProperty().unbind();
 
-        // Limpiar estadísticas detalladas
-        lblPromedioGeneral.setText("--");
-        lblMejorPuntaje.setText("--");
-        lblTiempoPromedio.setText("--");
-        lblTasaAprobacion.setText("--");
+                // Limpiar la lista de postulantes
+                listaPostulantes.clear();
 
-        btnEvaluarSecuencial.setDisable(true);
-        btnEvaluarParalelo.setDisable(true);
+                // Reiniciar progress bar
+                progressBar.setProgress(0);
 
-        // Resetear ComboBoxes
-        cmbEscuela.setValue("Todas las Escuelas");
-        cmbProceso.setValue("Todos los Procesos");
+                // Restaurar estado inicial
+                lblProgreso.setText("Sistema listo - Gabarito generado");
+                lblEstadisticas.setText("");
 
-        // Regenerar gabarito
-        gabaritoRespuestas = generarGabaritoAleatorio();
+                // Limpiar chart de forma segura
+                chartResultados.getData().clear();
+
+                // Limpiar estadísticas detalladas
+                lblPromedioGeneral.setText("--");
+                lblMejorPuntaje.setText("--");
+                lblTiempoPromedio.setText("--");
+                lblTasaAprobacion.setText("--");
+
+                // Deshabilitar botones de evaluación
+                btnEvaluarSecuencial.setDisable(true);
+                btnEvaluarParalelo.setDisable(true);
+
+                // Habilitar botón generar
+                btnGenerar.setDisable(false);
+
+                // Resetear ComboBoxes
+                cmbEscuela.setValue("Todas las Escuelas");
+                cmbProceso.setValue("Todos los Procesos");
+
+                // Regenerar gabarito
+                gabaritoRespuestas = generarGabaritoAleatorio();
+
+                // Refrescar tabla
+                tablePostulantes.refresh();
+
+                // Resetear spinner a valor por defecto
+                spinnerCantidad.getValueFactory().setValue(50);
+
+            } catch (Exception ex) {
+                System.err.println("Error durante la limpieza: " + ex.getMessage());
+                ex.printStackTrace();
+            }
+        });
     }
 
     /**
@@ -664,16 +807,26 @@ public class HelloController implements Initializable {
     }
 
     private void mostrarAlerta(String titulo, String mensaje) {
-        Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle(titulo);
-        alert.setHeaderText(null);
-        alert.setContentText(mensaje);
-        alert.showAndWait();
+        Platform.runLater(() -> {
+            try {
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle(titulo);
+                alert.setHeaderText(null);
+                alert.setContentText(mensaje);
+                alert.showAndWait();
+            } catch (Exception ex) {
+                System.err.println("Error mostrando alerta: " + ex.getMessage());
+            }
+        });
     }
 
     public void shutdown() {
-        if (tareaActual != null && tareaActual.isRunning()) {
-            tareaActual.cancel();
+        try {
+            if (tareaActual != null && tareaActual.isRunning()) {
+                tareaActual.cancel(true);
+            }
+        } catch (Exception ex) {
+            System.err.println("Error durante shutdown: " + ex.getMessage());
         }
     }
 }
