@@ -1,30 +1,65 @@
 package org.example.service;
 
+import org.example.models.Respuestas;
+import org.example.models.ResultadoExamen;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 
 public class EvaluatorsService {
 
-    public static float calcularPuntaje(String respuestas, String clave) {
-        if (respuestas == null || clave == null || respuestas.length() != clave.length()) {
-            throw new IllegalArgumentException("Las cadenas de respuestas y clave deben tener la misma longitud y no ser nulas.");
+    public static ResultadoExamen calcularResultado(Respuestas respuestas, String clave) {
+        if (respuestas == null || clave == null || clave.length() != 100) {
+            throw new IllegalArgumentException("Respuestas o clave inválidas.");
         }
 
-        float puntaje = 0;
+        int correctas = respuestas.contarRespuestasCorrectas(clave);
+        int incorrectas = respuestas.contarRespuestasIncorrectas(clave);
+        int nulas = respuestas.contarRespuestasNulas();
 
-        for (int i = 0; i < clave.length(); i++) {
-            char r = respuestas.charAt(i);
-            char c = clave.charAt(i);
+        double puntaje = (correctas * 20.0) - (incorrectas * 1.125);
 
-            if (r == c) {
-                puntaje += 20;
-            } else if (r != '*' && r != c) {
-                puntaje -= 1.275;
-            }
+        // Redondear a 2 decimales
+        BigDecimal bd = new BigDecimal(puntaje).setScale(2, RoundingMode.HALF_UP);
+        puntaje = bd.doubleValue();
+
+        ResultadoExamen resultado = new ResultadoExamen(respuestas.getCodigoPostulante());
+        resultado.setPuntaje(puntaje);
+        resultado.setRespuestasCorrectas(correctas);
+        resultado.setRespuestasIncorrectas(incorrectas);
+        resultado.setRespuestasNulas(nulas);
+        resultado.setFechaEvaluacion(LocalDateTime.now());
+
+        // Observación simple
+        if (puntaje == 0.0) {
+            resultado.setObservacion(ResultadoExamen.ObservacionEnum.NO_SE_PRESENTO);
+        } else {
+            resultado.setObservacion(ResultadoExamen.ObservacionEnum.ALCANZANTE);
         }
 
-        BigDecimal bd = new BigDecimal(Float.toString(puntaje));
-        bd = bd.setScale(2, RoundingMode.HALF_UP);
+        // Mérito se puede calcular luego por ordenamiento
+        resultado.setMerito("");
+
+        return resultado;
+    }
+
+    // MÉTODO AGREGADO para compatibilidad con HelloController
+    public static float calcularPuntaje(String respuestasPostulante, String clave) {
+        if (respuestasPostulante == null || clave == null || clave.length() != 100) {
+            throw new IllegalArgumentException("Respuestas o clave inválidas.");
+        }
+
+        // Crear objeto Respuestas temporal para usar los métodos existentes
+        Respuestas respuestas = new Respuestas("TEMP", respuestasPostulante);
+
+        int correctas = respuestas.contarRespuestasCorrectas(clave);
+        int incorrectas = respuestas.contarRespuestasIncorrectas(clave);
+
+        double puntaje = (correctas * 20.0) - (incorrectas * 1.125);
+
+        // Redondear a 2 decimales
+        BigDecimal bd = new BigDecimal(puntaje).setScale(2, RoundingMode.HALF_UP);
 
         return bd.floatValue();
     }

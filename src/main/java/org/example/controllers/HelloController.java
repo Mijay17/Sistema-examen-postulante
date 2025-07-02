@@ -443,8 +443,8 @@ public class HelloController implements Initializable {
                     resultado.setRespuestasNulas(nulas);
                     resultado.setFechaEvaluacion(LocalDateTime.now());
 
-                    // Determinar estado y observaciones
-                    if (puntajeCalculado >= 11.0) {
+                    // Cambiar estado según el puntaje
+                    if (puntajeCalculado >= 400) {
                         pe.setEstado("Aprobado");
                         resultado.setObservacion(ResultadoExamen.ObservacionEnum.ALCANZANTE);
                         resultado.setMerito("ALCANZANTE");
@@ -709,15 +709,16 @@ public class HelloController implements Initializable {
      * Genera un gabarito aleatorio de 100 preguntas
      */
     private String generarGabaritoAleatorio() {
-        StringBuilder gabarito = new StringBuilder();
-        String opciones = "ABCD";
-        java.util.Random random = new java.util.Random();
+//        StringBuilder gabarito = new StringBuilder();
+//        String opciones = "ABCD";
+//        java.util.Random random = new java.util.Random();
+//
+//        for (int i = 0; i < 100; i++) {
+//            gabarito.append(opciones.charAt(random.nextInt(4)));
+//        }
 
-        for (int i = 0; i < 100; i++) {
-            gabarito.append(opciones.charAt(random.nextInt(4)));
-        }
-
-        return gabarito.toString();
+        //return gabarito.toString();
+        return GeneratorService.generarRespuestasAleatorias();
     }
 
     /**
