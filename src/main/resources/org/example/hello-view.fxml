@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.chart.BarChart?>
+<?import javafx.scene.chart.CategoryAxis?>
+<?import javafx.scene.chart.NumberAxis?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.Font?>
+
+<BorderPane xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="org.example.controllers.HelloController">
+  <top>
+    <VBox BorderPane.alignment="CENTER">
+      <children>
+        <!-- Título Principal -->
+        <HBox alignment="CENTER" styleClass="header">
+          <children>
+            <Label styleClass="title" text="Sistema de Evaluación de Postulantes - UNMSM">
+              <font>
+                <Font name="System Bold" size="20.0" />
+              </font>
+            </Label>
+          </children>
+          <padding>
+            <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+          </padding>
+        </HBox>
+
+        <!-- Panel de Control Principal -->
+        <HBox alignment="CENTER" spacing="15.0" styleClass="control-panel">
+          <children>
+            <Label text="Cantidad de postulantes:">
+              <font>
+                <Font name="System Bold" size="14.0" />
+              </font>
+            </Label>
+            <Spinner fx:id="spinnerCantidad" prefWidth="80.0" />
+            <Button fx:id="btnGenerar" styleClass="primary-button" text="Generar Postulantes" />
+            <Separator orientation="VERTICAL" />
+            <Button fx:id="btnEvaluarSecuencial" disable="true" styleClass="secondary-button" text="Evaluación Secuencial" />
+            <Button fx:id="btnEvaluarParalelo" disable="true" styleClass="secondary-button" text="Evaluación Paralela" />
+            <Separator orientation="VERTICAL" />
+            <Button fx:id="btnLimpiar" styleClass="danger-button" text="Limpiar Todo" />
+          </children>
+          <padding>
+            <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
+          </padding>
+        </HBox>
+
+        <!-- Panel de Filtros -->
+        <HBox alignment="CENTER_LEFT" spacing="20.0" styleClass="filter-panel">
+          <children>
+            <Label text="Filtros:">
+              <font>
+                <Font name="System Bold" size="12.0" />
+              </font>
+            </Label>
+            <Label text="Escuela:" />
+            <ComboBox fx:id="cmbEscuela" prefWidth="200.0" />
+            <Label text="Proceso:" />
+            <ComboBox fx:id="cmbProceso" prefWidth="150.0" />
+          </children>
+          <padding>
+            <Insets bottom="10.0" left="15.0" right="15.0" top="5.0" />
+          </padding>
+        </HBox>
+
+        <!-- Panel de Progreso -->
+        <VBox styleClass="progress-panel">
+          <children>
+            <HBox alignment="CENTER_LEFT" spacing="10.0">
+              <children>
+                <Label text="Progreso:">
+                  <font>
+                    <Font name="System Bold" size="12.0" />
+                  </font>
+                </Label>
+                <ProgressBar fx:id="progressBar" prefWidth="350.0" />
+                <Label fx:id="lblProgreso" text="Listo para comenzar" />
+              </children>
+            </HBox>
+            <Label fx:id="lblEstadisticas" styleClass="statistics-label" />
+          </children>
+          <padding>
+            <Insets bottom="10.0" left="15.0" right="15.0" top="5.0" />
+          </padding>
+        </VBox>
+      </children>
+    </VBox>
+  </top>
+
+  <center>
+    <SplitPane dividerPositions="0.65" orientation="HORIZONTAL">
+      <items>
+        <!-- Tabla de Postulantes -->
+        <VBox>
+          <children>
+            <Label styleClass="section-title" text="Lista de Postulantes">
+              <font>
+                <Font name="System Bold" size="16.0" />
+              </font>
+            </Label>
+            <TableView fx:id="tablePostulantes" VBox.vgrow="ALWAYS">
+              <columns>
+                <TableColumn fx:id="colCodigo" prefWidth="90.0" text="Código" />
+                <TableColumn fx:id="colNombre" prefWidth="150.0" text="Nombre Completo" />
+                <TableColumn fx:id="colEscuela" prefWidth="130.0" text="Escuela Profesional" />
+                <TableColumn fx:id="colProceso" prefWidth="100.0" text="Proceso" />
+                <TableColumn fx:id="colPuntaje" prefWidth="70.0" text="Puntaje" />
+                <TableColumn fx:id="colEstado" prefWidth="90.0" text="Estado" />
+                <TableColumn fx:id="colTiempo" prefWidth="80.0" text="Tiempo (ms)" />
+              </columns>
+            </TableView>
+          </children>
+          <padding>
+            <Insets bottom="10.0" left="10.0" right="5.0" top="10.0" />
+          </padding>
+        </VBox>
+
+        <!-- Panel de Gráficos y Estadísticas -->
+        <VBox>
+          <children>
+            <Label styleClass="section-title" text="Estadísticas y Resultados">
+              <font>
+                <Font name="System Bold" size="16.0" />
+              </font>
+            </Label>
+            <BarChart fx:id="chartResultados" prefHeight="300.0" VBox.vgrow="ALWAYS">
+              <xAxis>
+                <CategoryAxis fx:id="xAxis" />
+              </xAxis>
+              <yAxis>
+                <NumberAxis fx:id="yAxis" />
+              </yAxis>
+            </BarChart>
+
+            <!-- Panel de estadísticas adicionales -->
+            <VBox spacing="10.0" styleClass="stats-detail-panel">
+              <children>
+                <Label styleClass="stats-title" text="Resumen Detallado del Examen de Admisión">
+                  <font>
+                    <Font name="System Bold" size="14.0" />
+                  </font>
+                </Label>
+                <GridPane hgap="10.0" vgap="5.0">
+                  <columnConstraints>
+                    <ColumnConstraints hgrow="SOMETIMES" prefWidth="140.0" />
+                    <ColumnConstraints hgrow="SOMETIMES" prefWidth="100.0" />
+                  </columnConstraints>
+                  <children>
+                    <Label text="Promedio General:" GridPane.columnIndex="0" GridPane.rowIndex="0" />
+                    <Label fx:id="lblPromedioGeneral" text="--" GridPane.columnIndex="1" GridPane.rowIndex="0" styleClass="stat-value" />
+                    <Label text="Mejor Puntaje:" GridPane.columnIndex="0" GridPane.rowIndex="1" />
+                    <Label fx:id="lblMejorPuntaje" text="--" GridPane.columnIndex="1" GridPane.rowIndex="1" styleClass="stat-value" />
+                    <Label text="Tiempo Promedio:" GridPane.columnIndex="0" GridPane.rowIndex="2" />
+                    <Label fx:id="lblTiempoPromedio" text="--" GridPane.columnIndex="1" GridPane.rowIndex="2" styleClass="stat-value" />
+                    <Label text="Tasa de Aprobación:" GridPane.columnIndex="0" GridPane.rowIndex="3" />
+                    <Label fx:id="lblTasaAprobacion" text="--" GridPane.columnIndex="1" GridPane.rowIndex="3" styleClass="stat-value" />
+                  </children>
+                </GridPane>
+              </children>
+              <padding>
+                <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+              </padding>
+            </VBox>
+          </children>
+          <padding>
+            <Insets bottom="10.0" left="5.0" right="10.0" top="10.0" />
+          </padding>
+        </VBox>
+      </items>
+    </SplitPane>
+  </center>
+
+  <bottom>
+    <HBox alignment="CENTER" styleClass="footer">
+      <children>
+        <Label text="Sistema de Evaluación v1.0 - Universidad Nacional Mayor de San Marcos">
+          <font>
+            <Font size="11.0" />
+          </font>
+        </Label>
+      </children>
+      <padding>
+        <Insets bottom="5.0" left="10.0" right="10.0" top="5.0" />
+      </padding>
+    </HBox>
+  </bottom>
+</BorderPane>
